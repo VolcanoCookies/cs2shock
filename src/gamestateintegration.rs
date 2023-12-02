@@ -73,7 +73,7 @@ pub struct Provider {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Payload {
-    pub provider: Optional<Provider>,
+    pub provider: Option<Provider>,
     pub map: Option<Map>,
     pub round: Option<Round>,
     pub player: Option<Player>,

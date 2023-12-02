@@ -8,7 +8,6 @@ use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use config::Config;
 use config_file::FromConfigFile;
 use gamestateintegration::{MapPhase, Payload, RoundPhase};
-use serde_json::Value;
 use tokio::sync::Mutex;
 
 pub const NAME: &str = "CS2 Shocker";
