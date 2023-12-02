@@ -1,0 +1,8 @@
+# Intensity of the shock
+shock_intensity = 10
+# PiShock username to access the api
+username = "PISHOCK_USERNAME"
+# PiShock share code to access the api
+code = "PISHOCK_SHARE_CODE"
+# PiShock api key to access the api
+apikey = "PISHOCK_API_KEY"
