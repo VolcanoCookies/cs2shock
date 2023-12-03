@@ -1,0 +1,45 @@
+kind: pipeline
+type: kubernetes
+name: default
+
+volumes:
+    - name: cache
+      temp: {}
+
+steps:
+    - name: test
+      image: rust:1.72
+      volumes:
+          - name: cache
+            path: /root/.cargo
+      commands:
+          - cargo build --verbose --all
+          - cargo test --verbose --all
+    - name: release
+      image: rust:1.72
+      when:
+          event:
+              - promote
+      commands:
+          - cargo build --verbose --all --release
+    - name: create_changelog
+      image: naorlivne/drone-github-changelog-generator
+      when:
+          event:
+              - promote
+      settings:
+          github_user: $DRONE_REPO_OWNER
+          github_project: $DRONE_REPO_NAME
+          output_path: CHANGELOG.md
+    - name: publish
+      image: plugins/github-release
+      when:
+          event:
+              - promote
+      settings:
+          api_key:
+              from_secret: github-token
+          title: $DRONE_REPO_NAME ${DRONE_TAG}
+          files:
+              - target/release/cs2shock
+              - CHANGELOG.md
