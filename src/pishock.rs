@@ -1,10 +1,11 @@
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{Map, Value};
 
 use crate::{config::Config, NAME};
 
 pub async fn post(config: &Config, body: PiShockOp) -> Result<i32, String> {
-    let mut raw_body = json!(body);
+    let mut raw_body = Value::Object(Map::new());
+
     if let Value::Object(inner) = &mut raw_body {
         inner.insert(
             "Username".to_owned(),
@@ -13,7 +14,29 @@ pub async fn post(config: &Config, body: PiShockOp) -> Result<i32, String> {
         inner.insert("Name".to_owned(), Value::String(NAME.to_string()));
         inner.insert("Code".to_owned(), Value::String(config.code.clone()));
         inner.insert("Apikey".to_owned(), Value::String(config.apikey.clone()));
-        inner.insert("Op".to_owned(), Value::Number(body.to_op().into()));
+
+        match body {
+            PiShockOp::Beep { duration } => {
+                inner.insert("Duration".to_owned(), Value::Number(duration.into()));
+                inner.insert("Op".to_owned(), Value::Number(2.into()));
+            }
+            PiShockOp::Vibrate {
+                intensity,
+                duration,
+            } => {
+                inner.insert("Intensity".to_owned(), Value::Number(intensity.into()));
+                inner.insert("Duration".to_owned(), Value::Number(duration.into()));
+                inner.insert("Op".to_owned(), Value::Number(1.into()));
+            }
+            PiShockOp::Shock {
+                intensity,
+                duration,
+            } => {
+                inner.insert("Intensity".to_owned(), Value::Number(intensity.into()));
+                inner.insert("Duration".to_owned(), Value::Number(duration.into()));
+                inner.insert("Op".to_owned(), Value::Number(0.into()));
+            }
+        }
     } else {
         return Err("raw_body is not an object".into());
     }

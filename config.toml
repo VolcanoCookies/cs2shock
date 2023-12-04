@@ -1,5 +1,11 @@
 # Intensity of the shock
-shock_intensity = 10
+max_shock_intensity = 10
+# Duration of the shock
+shock_duration = 1
+# Beep when match starts
+beep_on_match_start = true
+# Beep when round starts
+beep_on_round_start = true
 # PiShock username to access the api
 username = "PISHOCK_USERNAME"
 # PiShock share code to access the api
