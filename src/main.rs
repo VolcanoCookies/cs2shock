@@ -8,6 +8,10 @@ use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use config::Config;
 use config_file::FromConfigFile;
 use gamestateintegration::{MapPhase, Payload, RoundPhase};
+use log::{error, info};
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use simple_logger::SimpleLogger;
+use time::macros::format_description;
 use tokio::sync::Mutex;
 
 pub const NAME: &str = "CS2 Shocker";
@@ -55,17 +59,35 @@ impl GameState {
 
 #[tokio::main]
 async fn main() {
+    SimpleLogger::new()
+        .env()
+        .with_level(log::LevelFilter::Info)
+        .with_timestamp_format(format_description!(
+            "[[[year]-[month]-[day] [hour]:[minute]:[second]]"
+        ))
+        .init()
+        .expect("Failed to initialize logger");
+
     let mut config = Arc::new(
-        if let Ok(conf) = config::Config::from_config_file("config.toml") {
-            println!("Config file loaded");
+        if let Ok(conf) = config::Config::from_config_file("./config.toml") {
+            info!("Config file loaded");
             conf
         } else {
-            println!("Config file not found, creating default");
-            Config::default()
+            info!("Config file not found, creating default");
+            let c = Config::default();
+            c.write_to_file("config.toml");
+            c
         },
     );
 
-    println!("{} v{}", NAME, env!("CARGO_PKG_VERSION"));
+    if !config.validate() {
+        config = Arc::new(Config::default());
+        error!("Invalid config, using default");
+    }
+
+    info!("Config: \n{:?}", config);
+
+    info!("{} v{}", NAME, env!("CARGO_PKG_VERSION"));
 
     let state = AppState {
         game_state: Arc::from(Mutex::from(GameState::default())),
@@ -76,9 +98,14 @@ async fn main() {
         .route("/data", post(read_data))
         .with_state(state);
 
-    println!("Starting server on {}", "0.0.0.0:3000");
+    info!("Starting server on {}", "127.0.0.1:3000");
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    info!("Sending test beep");
+    pishock::beep(config, 1).await;
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -92,14 +119,10 @@ async fn read_data(State(state): State<AppState>, Json(payload): Json<Payload>) 
 
     if let Some(map) = payload.map {
         if game_state.map_phase == MapPhase::Warmup && map.phase == MapPhase::Live {
-            println!("Match started");
+            info!("Match started");
 
             if config.beep_on_match_start {
-                let res = pishock::post(&config, pishock::PiShockOp::Beep { duration: 2 }).await;
-                match res {
-                    Ok(code) => println!("Beeped with code {}", code),
-                    Err(e) => println!("Error while beeping: {}", e),
-                }
+                pishock::beep(config.clone(), 2).await;
             }
 
             // Reset game state to default
@@ -112,13 +135,8 @@ async fn read_data(State(state): State<AppState>, Json(payload): Json<Payload>) 
     if let Some(round) = payload.round {
         if game_state.round_phase == RoundPhase::Freezetime && round.phase == RoundPhase::Live {
             if config.beep_on_round_start {
-                println!("Round started");
-
-                let res = pishock::post(&config, pishock::PiShockOp::Beep { duration: 1 }).await;
-                match res {
-                    Ok(code) => println!("Beeped with code {}", code),
-                    Err(e) => println!("Error while beeping: {}", e),
-                }
+                info!("Round started");
+                pishock::beep(config.clone(), 1).await;
             }
         }
 
@@ -165,21 +183,27 @@ async fn read_data(State(state): State<AppState>, Json(payload): Json<Payload>) 
                 // Github Copilot is based
                 // let res = pishock::post(&api_state, pishock::PiShockOp::Shock { intensity: 100, duration: 1 }).await;
 
-                println!("Player died, shocking");
+                info!("Player died, shocking");
 
-                let res = pishock::post(
-                    &config,
-                    pishock::PiShockOp::Shock {
-                        intensity: config.max_shock_intensity,
-                        duration: config.shock_duration,
-                    },
-                )
-                .await;
+                match config.shock_mode {
+                    config::ShockMode::Random => {
+                        let mut rng = StdRng::from_entropy();
+                        let intensity = rng.gen_range(config.min_intensity..=config.max_intensity);
+                        let duration = rng.gen_range(config.min_duration..=config.max_duration);
 
-                match res {
-                    Ok(code) => println!("Shock with code {}", code),
-                    Err(e) => println!("Error while shocking: {}", e),
-                }
+                        pishock::shock(config, intensity, duration).await;
+                    }
+                    config::ShockMode::LastHitPercentage => {
+                        let intensity = (player_state.health as f32 / 100.0
+                            * config.max_intensity as f32)
+                            as i32;
+                        let duration = (player_state.health as f32 / 100.0
+                            * config.max_duration as f32)
+                            as i32;
+
+                        pishock::shock(config, intensity, duration).await;
+                    }
+                };
             }
 
             player_state.health = player.state.health;
