@@ -1,16 +1,15 @@
 use std::{fs::OpenOptions, io::Write};
 
 use log::error;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub enum ShockMode {
     Random,
     LastHitPercentage,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct Config {
     pub shock_mode: ShockMode,
     pub min_duration: i32,
@@ -79,42 +78,13 @@ impl Config {
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(path)
             .expect(format!("Failed to open config file, {}", path).as_str());
 
-        let raw = format!(
-            "# Shock mode, one of; random, last_hit_percentage
-shock_mode = \"random\"
-# Minimum duration of the shock
-min_duration = {}
-# Maximum duration of the shock
-max_duration = {}
-# Minimum intensity of the shock, 1-100
-min_intensity = {}
-# Maximum intensity of the shock, 1-100
-max_intensity = {}
-# Beep when match starts
-beep_on_match_start = {}
-# Beep when round starts
-beep_on_round_start = {}
-# PiShock username to access the api
-username = \"{}\"
-# PiShock share code to access the api
-code = \"{}\"
-# PiShock api key to access the api
-apikey = \"{}\"",
-            self.min_duration,
-            self.max_duration,
-            self.min_intensity,
-            self.max_intensity,
-            self.beep_on_match_start,
-            self.beep_on_round_start,
-            self.username,
-            self.code,
-            self.apikey
-        );
+        let json = serde_json::to_string_pretty(self).expect("Failed to serialize config");
 
-        file.write_all(raw.as_bytes())
+        file.write_all(json.as_bytes())
             .expect("Failed to write config file");
     }
 }

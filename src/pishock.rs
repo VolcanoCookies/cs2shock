@@ -3,10 +3,11 @@ use std::sync::Arc;
 use log::{debug, error, info};
 use serde::Serialize;
 use serde_json::{Map, Value};
+use tokio::sync::RwLock;
 
 use crate::{config::Config, NAME};
 
-pub async fn shock(config: Arc<Config>, intensity: i32, duration: i32) {
+pub async fn shock(config: Arc<RwLock<Config>>, intensity: i32, duration: i32) {
     debug!( target: "PiShock API", "Sending shock: {}, {}", intensity, duration);
 
     let res = post(
@@ -30,7 +31,7 @@ pub async fn shock(config: Arc<Config>, intensity: i32, duration: i32) {
     }
 }
 
-pub async fn vibrate(config: Arc<Config>, intensity: i32, duration: i32) {
+pub async fn vibrate(config: Arc<RwLock<Config>>, intensity: i32, duration: i32) {
     debug!( target: "PiShock API",
         "Sending vibrate: {}, {}", intensity, duration
     );
@@ -57,7 +58,7 @@ pub async fn vibrate(config: Arc<Config>, intensity: i32, duration: i32) {
     }
 }
 
-pub async fn beep(config: Arc<Config>, duration: i32) {
+pub async fn beep(config: Arc<RwLock<Config>>, duration: i32) {
     debug!( target: "PiShock API", "Sending beep: {}", duration);
 
     let res = post(config, PiShockOp::Beep { duration }).await;
@@ -75,8 +76,10 @@ pub async fn beep(config: Arc<Config>, duration: i32) {
     }
 }
 
-pub async fn post(config: Arc<Config>, body: PiShockOp) -> Result<i32, String> {
+pub async fn post(config: Arc<RwLock<Config>>, body: PiShockOp) -> Result<i32, String> {
     let mut raw_body = Value::Object(Map::new());
+
+    let config = config.read().await;
 
     if let Value::Object(inner) = &mut raw_body {
         inner.insert(
@@ -142,20 +145,4 @@ pub enum PiShockOp {
     Beep { duration: i32 },
     Vibrate { intensity: i32, duration: i32 },
     Shock { intensity: i32, duration: i32 },
-}
-
-impl PiShockOp {
-    pub fn to_op(self) -> i32 {
-        match self {
-            PiShockOp::Beep { duration: _ } => 2,
-            PiShockOp::Vibrate {
-                intensity: _,
-                duration: _,
-            } => 1,
-            PiShockOp::Shock {
-                intensity: _,
-                duration: _,
-            } => 0,
-        }
-    }
 }

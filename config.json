@@ -1,0 +1,12 @@
+{
+  "shock_mode": "LastHitPercentage",
+  "min_duration": 5,
+  "max_duration": 15,
+  "min_intensity": 15,
+  "max_intensity": 83,
+  "beep_on_match_start": false,
+  "beep_on_round_start": true,
+  "username": "test",
+  "code": "somesharecode",
+  "apikey": "1349390485"
+}
